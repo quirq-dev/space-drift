@@ -1,0 +1,19 @@
+{
+  "name": "space-explorer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Fly through a living map of your local folder.",
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node server.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "check": "node --check server.mjs && node --check public/main.js && node --check public/model.js && node --check public/viewer.js && node --check lib/files.mjs"
+  },
+  "dependencies": {
+    "three": "0.185.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
