@@ -113,7 +113,7 @@ Launch expedition
     |
     +--> Manual flight: W/A/S/D, R/F, Shift, Space
     |          |
-    |          +--> approach a crystal and press E
+    |          +--> press E nearby, or aim and fire from up to 90 units away
     |          |          |
     |          |          +--> open local preview --> close / Escape --> resume at the same location
     |          |          |
@@ -126,7 +126,7 @@ Launch expedition
 
 ## Open a file
 
-Approach a crystal and press **E**, or use **M** to find a file and fly to it. Space Drift pauses flight while the file viewer is open and holds position after guided arrival; any movement key resumes manual flight. Text/code, images, PDFs, audio, and video display inside the viewer. Press **Escape** or close the viewer to return to the same location.
+Press **E** to open a nearby crystal (within 18 units, no aiming needed), or aim the ship at a signal up to 90 units away and fire with the same key. The centre reticle lights up and names the file that will open. A ranged shot visibly launches from the ship, travels to the crystal, and flashes on impact before opening the viewer; you can keep flying during the shot. Nearby opens remain instant. Ranged shots use a 12° horizontal half-angle and allow up to 30 units of vertical offset; aim matters more than distance, and an atlas-selected file stays locked while within 90 units (nearby files still take priority). Use **M** to find a file and set a course. Space Drift pauses flight while the file viewer is open: a ranged shot preserves your velocity for closing the viewer, while a nearby open or guided arrival holds position until a movement key resumes manual flight. Text/code, images, PDFs, audio, and video display inside the viewer. Press **Escape** or close the viewer to return to the same location.
 
 In optional local-server mode on macOS, **Open in desktop app** opens documents in their normal application; text and code use the text editor. Files without a built-in preview retain this option where appropriate. Unknown, archive, and executable formats use **Show in Finder**. These desktop actions are unavailable in hosted/browser-folder mode.
 
