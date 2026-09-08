@@ -5,6 +5,10 @@
  */
 
 export const PALETTE = [0x68e4ef, 0xaab8ff, 0xc4a5ff, 0xffad9b, 0x77b9ff, 0xf29bd3];
+export const SCAN_RANGE = 18;
+export const SHOT_RANGE = 90;
+const SHOT_HALF_ANGLE = 12 * Math.PI / 180;
+const SHOT_VERTICAL_TOLERANCE = 30;
 const TAU = Math.PI * 2;
 const SHIP_RADIUS = 1.4;
 const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
@@ -277,6 +281,32 @@ export function findNearestFile(world, position, maxDistance = Infinity) {
     }
   }
   return nearest;
+}
+
+/** Nearby files need no aim; ranged shots use yaw with forgiving altitude. */
+export function findScanCandidate(world, ship, focusedFileId = null) {
+  const files = world?.files || [];
+  const rangeTo = (file) => Math.hypot(file.position.x - ship.position.x, file.position.y - ship.position.y, file.position.z - ship.position.z);
+  const focused = files.find((file) => file.id === focusedFileId);
+  if (focused && rangeTo(focused) <= SCAN_RANGE) return focused;
+  const nearby = findNearestFile(world, ship.position, SCAN_RANGE);
+  if (nearby) return nearby;
+  // Keep the atlas lock in range, but never override a point-blank file.
+  if (focused && rangeTo(focused) <= SHOT_RANGE) return focused;
+
+  let best = null, bestAngle = Infinity, bestDistance = Infinity;
+  for (const file of files) {
+    const dx = file.position.x - ship.position.x, dy = file.position.y - ship.position.y, dz = file.position.z - ship.position.z;
+    const distance = Math.hypot(dx, dy, dz);
+    if (distance > SHOT_RANGE || Math.abs(dy) > SHOT_VERTICAL_TOLERANCE || Math.hypot(dx, dz) === 0) continue;
+    const heading = Math.atan2(-dx, -dz);
+    const angle = Math.abs(Math.atan2(Math.sin(heading - ship.yaw), Math.cos(heading - ship.yaw)));
+    if (angle > SHOT_HALF_ANGLE) continue;
+    if (angle < bestAngle || angle === bestAngle && distance < bestDistance) {
+      best = file; bestAngle = angle; bestDistance = distance;
+    }
+  }
+  return best;
 }
 
 export function formatBytes(value) {
