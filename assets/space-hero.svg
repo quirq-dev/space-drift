@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">Space workspace explorer</title>
+  <desc id="desc">A ship travels through glowing folder districts and file crystals in deep space.</desc>
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#050b29"/><stop offset=".48" stop-color="#101656"/><stop offset="1" stop-color="#30134f"/>
+    </linearGradient>
+    <radialGradient id="nebula"><stop stop-color="#9157ff" stop-opacity=".8"/><stop offset=".45" stop-color="#4661ef" stop-opacity=".25"/><stop offset="1" stop-color="#02051c" stop-opacity="0"/></radialGradient>
+    <linearGradient id="island" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#443977"/><stop offset="1" stop-color="#171535"/></linearGradient>
+    <linearGradient id="folder" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffb96e"/><stop offset=".45" stop-color="#ff766f"/><stop offset="1" stop-color="#bd3f8a"/></linearGradient>
+    <linearGradient id="crystal" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#dcf9ff"/><stop offset=".3" stop-color="#55ddff"/><stop offset="1" stop-color="#6b4bdf"/></linearGradient>
+    <linearGradient id="trail" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#69e9ff" stop-opacity="0"/><stop offset=".7" stop-color="#69e9ff"/><stop offset="1" stop-color="#ff8fbb"/></linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="10" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="soft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="35"/></filter>
+  </defs>
+  <rect width="1600" height="900" fill="url(#sky)"/>
+  <ellipse cx="1040" cy="290" rx="720" ry="500" fill="url(#nebula)" filter="url(#soft)"/>
+  <g fill="#d9f7ff"><circle cx="80" cy="98" r="2"/><circle cx="181" cy="250" r="3"/><circle cx="330" cy="89" r="2"/><circle cx="506" cy="184" r="2"/><circle cx="709" cy="72" r="3"/><circle cx="862" cy="160" r="2"/><circle cx="1135" cy="75" r="3"/><circle cx="1370" cy="195" r="2"/><circle cx="1510" cy="70" r="3"/><circle cx="1460" cy="540" r="2"/><circle cx="115" cy="650" r="2"/><circle cx="430" cy="760" r="2"/><circle cx="779" cy="728" r="3"/><circle cx="1230" cy="780" r="2"/><circle cx="1550" cy="700" r="2"/></g>
+  <g fill="none" stroke="#8e87ff" stroke-opacity=".45"><ellipse cx="1115" cy="465" rx="410" ry="175" transform="rotate(-17 1115 465)"/><ellipse cx="1115" cy="465" rx="520" ry="250" transform="rotate(-17 1115 465)"/><path d="M530 720 C760 480 1000 725 1510 425"/><path d="M615 180 C895 410 1140 154 1530 270"/></g>
+  <g stroke="#69e9ff" stroke-opacity=".55" fill="none"><path d="M860 262l85 32 35 85-85 35-85-35z"/><path d="M1285 510l62 23 25 62-62 25-62-25z"/></g>
+  <g transform="translate(1040 330)">
+    <ellipse cx="110" cy="270" rx="225" ry="52" fill="#5f3dd4" opacity=".35" filter="url(#soft)"/>
+    <path d="M-45 205 L260 205 225 315 55 360-85 294z" fill="url(#island)"/>
+    <path d="M-45 205 L55 360 55 260 260 205z" fill="#252052"/>
+    <path d="M-15 175h80l22-30h98l28 30h92v104H-15z" fill="url(#folder)" filter="url(#glow)"/>
+    <path d="M-15 175h320v25H-15z" fill="#ffd29e" opacity=".45"/>
+    <path d="M38 130h70l16-23h83l23 23h47v45H38z" fill="#ff8d86"/>
+    <circle cx="146" cy="218" r="6" fill="#fff3d2"/><circle cx="181" cy="244" r="4" fill="#fff3d2"/>
+  </g>
+  <g transform="translate(1350 220)">
+    <ellipse cx="0" cy="175" rx="112" ry="30" fill="#55dfff" opacity=".28" filter="url(#soft)"/>
+    <path d="M0 5l55 92-55 130L-55 97z" fill="url(#crystal)" filter="url(#glow)"/>
+    <path d="M0 5v222L55 97z" fill="#9e79ff" opacity=".7"/><path d="M-55 97h110L0 227z" fill="#3a74e8" opacity=".75"/>
+  </g>
+  <g transform="translate(795 570) scale(.72)">
+    <ellipse cx="0" cy="195" rx="135" ry="35" fill="#6c55f5" opacity=".25" filter="url(#soft)"/>
+    <path d="M0 0l55 90-55 130L-55 90z" fill="url(#crystal)" filter="url(#glow)"/><path d="M0 0v220L55 90z" fill="#8d6cff" opacity=".65"/>
+  </g>
+  <g transform="translate(370 635) rotate(-11)">
+    <path d="M-270 47 C-170 3-95 10-5 40" stroke="url(#trail)" stroke-width="17" fill="none" filter="url(#glow)"/>
+    <path d="M-195 67 C-105 40-70 42-5 55" stroke="#8defff" stroke-opacity=".65" stroke-width="4" fill="none"/>
+    <path d="M-13 20 L118 38 168 78 82 110-28 91-95 70z" fill="#d7e9ff" stroke="#70e4ff" stroke-width="4"/>
+    <path d="M-28 91 L82 110 56 140-75 106z" fill="#7987c9"/><path d="M13 28l54 47-50 16-40-35z" fill="#273763"/>
+    <path d="M75 40l47 13 34 25-61 2z" fill="#ff8e89"/><path d="M-32 61l-54 42 72 3 31-24z" fill="#8f77e8"/>
+    <circle cx="116" cy="74" r="10" fill="#5ff3ff" filter="url(#glow)"/><circle cx="92" cy="83" r="7" fill="#5ff3ff"/>
+  </g>
+  <g fill="#ffbf82" filter="url(#glow)"><circle cx="1140" cy="234" r="5"/><circle cx="1240" cy="372" r="4"/><circle cx="1467" cy="408" r="6"/><circle cx="934" cy="490" r="4"/></g>
+  <text x="96" y="145" fill="#edf7ff" font-family="system-ui, sans-serif" font-size="72" font-weight="700" letter-spacing="8">SPACE</text>
+  <text x="102" y="195" fill="#a8c6ff" font-family="system-ui, sans-serif" font-size="24" letter-spacing="3">YOUR LOCAL FOLDER, REIMAGINED</text>
+</svg>
