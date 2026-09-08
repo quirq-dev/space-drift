@@ -37,6 +37,41 @@ Click **Launch expedition** to begin. Chart five files to complete the first exp
 
 The interface includes exploration and navigation controls. The world refreshes from disk every five seconds while the page is open. Edit, add, rename, or move a file in your normal editor or file manager to create activity in the map. The game itself does not change your files.
 
+## Map at a glance
+
+```text
+Your local folder
+        |
+        | scan names, sizes, and modification times
+        v
++------------------+        refresh every 5 seconds        +------------------+
+| Space server     | ------------------------------------> | Browser world    |
+| (127.0.0.1 only) |                                       | districts, files |
++------------------+                                       +------------------+
+        |                                                           |
+        | read a selected file only when you press E                | fly, chart, or search
+        v                                                           v
++------------------+                                       +------------------+
+| Local file       | <----------------------------------- | File viewer /    |
+| contents         |                                       | workspace atlas  |
++------------------+                                       +------------------+
+```
+
+```text
+Launch expedition
+        |
+        v
+Explore districts -- M --> choose a destination --> guided flight
+        |                         |
+        | E near a file           | steering input
+        v                         v
+Open local preview <------------- return to manual flight
+        |
+        +-- chart five files --> first expedition complete
+```
+
+The map is built from metadata first; file contents are requested only for the local preview opened with **E**. Any steering input cancels guided flight.
+
 ## Open a file
 
 Approach a crystal and press **E**, or use **M** to find a file and fly to it. Space pauses flight while the file viewer is open and holds position after guided arrival; any movement key resumes manual flight. Text/code, images, PDFs, audio, and video display inside the viewer. Press **Escape** or close the viewer to return to the same location.
