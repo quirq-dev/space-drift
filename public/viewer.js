@@ -7,7 +7,7 @@ export function createFileViewer({ onClose = () => {} } = {}) {
   dialog.setAttribute('aria-labelledby', 'viewer-title');
   dialog.innerHTML = `
     <div class="viewer-header">
-      <div class="viewer-identity"><div class="eyebrow">SPACE / FILE VIEWER</div><h2 id="viewer-title"></h2><p id="viewer-path"></p></div>
+      <div class="viewer-identity"><div class="eyebrow">SPACE DRIFT / FILE VIEWER</div><h2 id="viewer-title"></h2><p id="viewer-path"></p></div>
       <button class="viewer-close" aria-label="Close file and return to flight" title="Return to flight (Escape)">×</button>
     </div>
     <div class="viewer-toolbar"><span id="viewer-meta"></span><div class="viewer-actions"><button id="viewer-copy" type="button">Copy path ↗</button><button id="viewer-desktop" type="button" hidden>Open in desktop app ↗</button></div></div>
@@ -41,7 +41,7 @@ export function createFileViewer({ onClose = () => {} } = {}) {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'The desktop app could not be opened.');
-      if (number === requestNumber && dialog.open) find('viewer-status').textContent = result.action === 'revealed' ? 'Shown in Finder. Return to Space whenever you’re ready.' : 'Opened in your desktop app. Return to Space whenever you’re ready.';
+      if (number === requestNumber && dialog.open) find('viewer-status').textContent = result.action === 'revealed' ? 'Shown in Finder. Return to Space Drift whenever you’re ready.' : 'Opened in your desktop app. Return to Space Drift whenever you’re ready.';
     } catch (error) {
       if (number === requestNumber && dialog.open) find('viewer-status').textContent = error.name === 'TimeoutError' ? 'Opening took too long. You can try again.' : error.message;
     } finally { if (number === requestNumber) find('viewer-desktop').disabled = false; }

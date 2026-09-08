@@ -1,6 +1,6 @@
-# Space
+# Space Drift
 
-![A ship flying through glowing folder districts and file crystals in space.](assets/space-hero.svg)
+![A ship flying through glowing folder districts and file crystals in space.](assets/space-drift-hero.svg)
 
 Fly a small ship through a living map of a local folder. Folders form districts, file size gives objects mass, and file activity creates currents you can feel while flying. This is a local prototype: your folder supplies the world, and the game maps file names and metadata, then reads file contents locally when you press E to open them.
 
@@ -9,12 +9,12 @@ Fly a small ship through a living map of a local folder. Folders form districts,
 Requires Node.js 20 or newer and npm.
 
 ```sh
-cd data-drift
+cd space-drift
 npm install
 npm start
 ```
 
-Open [Space](http://127.0.0.1:4188). The default map is the containing `quirq` project. To explore another folder or use a different port:
+Open [Space Drift](http://127.0.0.1:4188). The default map is the containing `quirq` project. To explore another folder or use a different port:
 
 ```sh
 npm start -- --root "/absolute/path/to/your/folder" --port 4188
@@ -63,7 +63,7 @@ The interface includes exploration and navigation controls. The world refreshes 
            | sizes, timestamps; ignores  |                             | every 5 seconds
            | hidden/generated/unsafe     |                             v
            v                             |                 +-----------+------------+
-+----------+----------------------------+--+              | Space server           |
++----------+----------------------------+--+              | Space Drift server     |
 | lib/scan.mjs                             |              | node:http on 127.0.0.1 |
 | creates world snapshots and change events |              +-----------+------------+
 +----------+----------------------------+--+                          |
@@ -81,7 +81,7 @@ The browser receives map metadata during normal refreshes. It requests file cont
 ## Flight and exploration flow
 
 ```text
-Open Space
+Open Space Drift
     |
     v
 Load world snapshot --------------------> districts, file crystals, activity currents
@@ -104,7 +104,7 @@ Launch expedition
 
 ## Open a file
 
-Approach a crystal and press **E**, or use **M** to find a file and fly to it. Space pauses flight while the file viewer is open and holds position after guided arrival; any movement key resumes manual flight. Text/code, images, PDFs, audio, and video display inside the viewer. Press **Escape** or close the viewer to return to the same location.
+Approach a crystal and press **E**, or use **M** to find a file and fly to it. Space Drift pauses flight while the file viewer is open and holds position after guided arrival; any movement key resumes manual flight. Text/code, images, PDFs, audio, and video display inside the viewer. Press **Escape** or close the viewer to return to the same location.
 
 Use **Open in desktop app** to open documents in their normal macOS application; text and code use the text editor. Files without a built-in preview still have this option where appropriate. Unknown, archive, and executable formats use **Show in Finder** instead. Desktop integration currently supports macOS.
 
@@ -122,7 +122,7 @@ The scanner maps at most 2,500 files, inspects at most 25,000 directory entries,
 
 ## Local data access
 
-The server binds to `127.0.0.1`, accepts only its own local host and origin, and keeps all file access confined to the currently mapped, eligible files. `/api/world` returns names, relative paths, sizes, modification times, and recent metadata changes. `/api/file` reads a requested mapped file for preview, and `/api/file-content` streams image/PDF/audio/video content. Text previews use plain text, capped at 256 KiB; executable HTML is never rendered as a page. The desktop-opening endpoint accepts same-origin JSON requests and uses the macOS document opener without a shell. Source and script files open as text; unknown and executable formats are revealed in Finder. Space does not upload files or maps or send them to an AI service. An external desktop application uses its own settings.
+The server binds to `127.0.0.1`, accepts only its own local host and origin, and keeps all file access confined to the currently mapped, eligible files. `/api/world` returns names, relative paths, sizes, modification times, and recent metadata changes. `/api/file` reads a requested mapped file for preview, and `/api/file-content` streams image/PDF/audio/video content. Text previews use plain text, capped at 256 KiB; executable HTML is never rendered as a page. The desktop-opening endpoint accepts same-origin JSON requests and uses the macOS document opener without a shell. Source and script files open as text; unknown and executable formats are revealed in Finder. Space Drift does not upload files or maps or send them to an AI service. An external desktop application uses its own settings.
 
 ## Verify
 
@@ -132,11 +132,11 @@ npm test
 
 Tests cover scanning, ignored entries, symlinks, bounded scans, actual file-change detection, concurrent requests, event limits, and HTTP access boundaries.
 
-The pure model tests additionally cover deterministic layout, frame-rate-independent movement, boosted collision, crystal-tip collision, bounded mass attraction, and empty maps. `npm run check` checks server and browser JavaScript syntax. A read-only `window.__SPACE__.getState()` diagnostic reports position, velocity, current destination, exploration progress, render counters, and live-event counts; the same snapshot is available on `#scene` as `data-telemetry`.
+The pure model tests additionally cover deterministic layout, frame-rate-independent movement, boosted collision, crystal-tip collision, bounded mass attraction, and empty maps. `npm run check` checks server and browser JavaScript syntax. A read-only `window.__SPACE_DRIFT__.getState()` diagnostic reports position, velocity, current destination, exploration progress, render counters, and live-event counts; the same snapshot is available on `#scene` as `data-telemetry`.
 
 Initial flight prototype verified locally on 2026-09-07: all 14 original tests and syntax checks passed; browser playtesting covered launch, keyboard thrust/steering/altitude, atlas search, continuous flight to `PROJECT.md`, targeted E scanning, live creation/modification events, 1280×800 and 390×844 layouts, and a clean browser error log.
 
-The Space update passes 22 tests covering file access, safe text previews, media ranges, and desktop launch arguments with an injected executor. Browser checks verified text and PDF opening with E, reopening a visited file without duplicate progress, paused flight during reading, held arrival, and desktop/mobile viewer layouts.
+The Space Drift update passes 22 tests covering file access, safe text previews, media ranges, and desktop launch arguments with an injected executor. Browser checks verified text and PDF opening with E, reopening a visited file without duplicate progress, paused flight during reading, held arrival, and desktop/mobile viewer layouts.
 
 ## Code map
 
@@ -146,6 +146,6 @@ The Space update passes 22 tests covering file access, safe text previews, media
 - `public/model.js`: repeatable world generation and flight physics.
 - `public/main.js`: Three.js scene, controls, guided flight and exploration.
 - `public/viewer.js` / `viewer.css`: local file viewer and return-to-flight behavior.
-- `public/index.html` / `styles.css`: Space branding and responsive controls.
+- `public/index.html` / `styles.css`: Space Drift branding and responsive controls.
 
 Inspired by [Building games with Astra](https://developers.openai.com/blog/how-to-build-games-with-astra): begin with a playable experience, separate simulation from rendering, and expose enough state to verify actual journeys.

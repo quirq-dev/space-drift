@@ -409,7 +409,7 @@ function updateHUD(dt) {
   if (state.launched && region && !state.visited.has(region.id)) { state.visited.add(region.id); updateMission(); }
   $('destination').hidden = !state.destination;
   if (state.destination) { $('destination-name').textContent = state.destination.name; $('destination-distance').textContent = `${Math.round(distance(ship.position, state.destination.position))} units to arrival`; }
-  $('scene').dataset.telemetry = JSON.stringify(window.__SPACE__?.getState());
+  $('scene').dataset.telemetry = JSON.stringify(window.__SPACE_DRIFT__?.getState());
 }
 
 function animate(time) {
@@ -471,6 +471,5 @@ addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; cam
 renderer.domElement.addEventListener('webglcontextlost', (event) => { event.preventDefault(); state.paused = true; $('error').hidden = false; $('error-message').textContent = 'The graphics context was interrupted. Reload to return to the launch point.'; });
 
 // Read-only diagnostics support real-control browser tests without teleport hooks.
-window.__SPACE__ = Object.freeze({ getState: () => ({ ready: !!state.world, launched: state.launched, paused: state.paused, currents: state.currents, position: { ...state.ship.position }, velocity: { ...state.ship.velocity }, yaw: state.ship.yaw, files: state.world?.files.length || 0, sectors: state.world?.sectors.length || 0, charted: [...state.charted], visited: [...state.visited], destination: state.destination ? { id: state.destination.id, name: state.destination.name, kind: state.destination.kind } : null, nearest: state.nearest ? { id: state.nearest.id, distance: distance(state.ship.position, state.nearest.position) } : null, fps: Math.round(state.fps), drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles, liveEvents: state.snapshot?.events.length || 0, viewerOpen: fileViewer.isOpen, openedFile: fileViewer.path }) });
-window.__DATA_DRIFT__ = window.__SPACE__; // Preserve the original diagnostics name.
+window.__SPACE_DRIFT__ = Object.freeze({ getState: () => ({ ready: !!state.world, launched: state.launched, paused: state.paused, currents: state.currents, position: { ...state.ship.position }, velocity: { ...state.ship.velocity }, yaw: state.ship.yaw, files: state.world?.files.length || 0, sectors: state.world?.sectors.length || 0, charted: [...state.charted], visited: [...state.visited], destination: state.destination ? { id: state.destination.id, name: state.destination.name, kind: state.destination.kind } : null, nearest: state.nearest ? { id: state.nearest.id, distance: distance(state.ship.position, state.nearest.position) } : null, fps: Math.round(state.fps), drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles, liveEvents: state.snapshot?.events.length || 0, viewerOpen: fileViewer.isOpen, openedFile: fileViewer.path }) });
 loadWorld(); setInterval(loadWorld, 5000); requestAnimationFrame(animate);
