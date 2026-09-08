@@ -98,6 +98,7 @@
 .reticle i:nth-child(4){right:0;bottom:0;border-width:0 1px 1px 0}
 .reticle.locked{color:var(--cyan)}.reticle.locked i{opacity:1;box-shadow:0 0 8px #68e4ef66}
 #reticle-target{position:absolute;top:35px;left:50%;transform:translateX(-50%);width:max-content;max-width:min(280px,70vw);overflow-wrap:anywhere;font:10px monospace;line-height:1.5;background:rgba(8,11,24,.8);padding:4px 7px;border-radius:3px}
+.shot-preview #reticle-target{top:50%;left:auto;right:35px;transform:translateY(-50%)}
 .destination{position:fixed;right:36px;bottom:85px;display:grid;grid-template-columns:1fr auto;gap:8px 20px;max-width:260px}
 .destination strong{font-size:13px;font-weight:400;grid-column:1;overflow:hidden;text-overflow:ellipsis}
 .destination button{grid-column:2;grid-row:1 / 3;align-self:center;width:26px;height:26px;border:1px solid var(--line);border-radius:50%;background:none;color:var(--soft)}

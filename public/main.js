@@ -1,5 +1,5 @@
 import * as THREE from '/vendor/three.module.js';
-import { buildWorld, stepShip, findNearestFile, findScanCandidate, SCAN_RANGE, SHOT_RANGE, formatBytes, hash } from './model.js';
+import { buildWorld, stepShip, findNearestFile, findScanCandidate, createFileShot, stepFileShot, SCAN_RANGE, SHOT_RANGE, formatBytes, hash } from './model.js';
 import { createFileViewer } from './viewer.js';
 import { createDirectorySource, createSnapshotSource } from './folder-source.js';
 
@@ -122,40 +122,51 @@ for (let i = 0; i < 2; i++) {
 scene.add(beacon); beacon.visible = false;
 const navigationLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineDashedMaterial({ color: 0xc4cfff, dashSize: 2, gapSize: 3, transparent: true, opacity: .4 }));
 navigationLine.visible = false; scene.add(navigationLine);
-// Use a mesh rather than a one-pixel WebGL line so distant shots stay visible.
-const shotBeam = new THREE.Mesh(new THREE.CylinderGeometry(.14, .14, 1, 8), new THREE.MeshBasicMaterial({ color: 0x68e4ef, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
-const shotHead = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, color: 0xffffff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
-shotBeam.visible = shotHead.visible = false; scene.add(shotBeam, shotHead);
+// Use geometry, not line width: WebGL lines are only one pixel on many devices.
+const shotEffect = new THREE.Group(); scene.add(shotEffect); shotEffect.visible = false;
+const shotBeam = new THREE.Mesh(new THREE.CylinderGeometry(.16, .16, 1, 8), new THREE.MeshBasicMaterial({ color: 0x68e4ef, transparent: true, depthTest: false, depthWrite: false, toneMapped: false, blending: THREE.AdditiveBlending }));
+const shotGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, color: 0xdafaff, transparent: true, depthTest: false, depthWrite: false, toneMapped: false, blending: THREE.AdditiveBlending }));
+const muzzleFlash = new THREE.Sprite(shotGlow.material.clone());
+for (const mesh of [shotBeam, shotGlow, muzzleFlash]) { mesh.renderOrder = 10; shotEffect.add(mesh); }
+const beamAxis = new THREE.Vector3(0, 1, 0);
 let shot = null;
 
+function cancelShot() { shot = null; shotEffect.visible = false; document.body.classList.remove('shot-preview'); }
 function fireBeam(file) {
-  const start = v(state.ship.position).add(new THREE.Vector3(-Math.sin(state.ship.yaw) * 5.4, .6, -Math.cos(state.ship.yaw) * 5.4));
-  shot = { file, start, end: v(file.position), age: 0, hit: false, sourceVersion: state.sourceVersion };
-  shotBeam.material.color.setHex(file.color); document.body.classList.add('shot-preview');
+  shot = { ...createFileShot(state.ship, file), sourceVersion: state.sourceVersion };
+  document.body.classList.add('shot-preview'); shotEffect.visible = true;
+  renderShot();
 }
-function cancelShot() { shot = null; shotBeam.visible = shotHead.visible = false; document.body.classList.remove('shot-preview'); }
+function renderShot() {
+  const start = v(shot.start), end = v(shot.end);
+  const head = start.clone().lerp(end, shot.progress);
+  const tail = start.clone().lerp(end, Math.max(0, shot.progress - 18 / shot.distance));
+  const delta = head.clone().sub(tail), length = delta.length();
+  shotBeam.visible = shot.phase === 'flight' && length > .01;
+  if (shotBeam.visible) {
+    shotBeam.position.copy(tail).add(head).multiplyScalar(.5);
+    shotBeam.quaternion.setFromUnitVectors(beamAxis, delta.divideScalar(length));
+    shotBeam.scale.set(1, length, 1);
+  }
+  shotGlow.position.copy(head);
+  shotGlow.scale.setScalar(shot.phase === 'impact' ? 5 + shot.age * 35 : 3.5);
+  shotGlow.material.opacity = shot.phase === 'impact' ? Math.max(0, 1 - shot.age / .2) : 1;
+  muzzleFlash.position.copy(start); muzzleFlash.scale.setScalar(4 + shot.age * 20);
+  muzzleFlash.visible = shot.phase === 'flight' && shot.age < .15;
+  muzzleFlash.material.opacity = Math.max(0, 1 - shot.age / .15);
+}
 function updateShot(dt) {
   if (!shot) return;
-  // Never open a stale target after the pilot leaves flight or changes folders.
-  if (!state.launched || state.paused || anyDialog() || document.hidden || shot.sourceVersion !== state.sourceVersion || !state.world?.files.some((file) => file.id === shot.file.id)) { cancelShot(); return; }
-  shot.age += dt;
-  const travel = .35, linger = .25;
-  const progress = Math.min(1, shot.age / travel);
-  const head = shot.start.clone().lerp(shot.end, progress);
-  const delta = head.clone().sub(shot.start);
-  shotBeam.position.copy(shot.start).add(head).multiplyScalar(.5);
-  shotBeam.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), delta.clone().normalize());
-  shotBeam.scale.set(1, delta.length(), 1);
-  shotBeam.material.opacity = Math.max(0, 1 - Math.max(0, shot.age - travel) / linger);
-  shotHead.position.copy(head); shotHead.scale.setScalar(progress < 1 ? 4.5 : 8);
-  shotHead.material.opacity = shotBeam.material.opacity;
-  shotBeam.visible = shotHead.visible = true;
-  if (progress === 1 && !shot.hit) { shot.hit = true; addRipple(shot.end, shot.file.color); }
-  // Let both the travelling tracer and its impact render before the modal covers them.
-  if (shot.age >= travel + linger) {
-    const file = shot.file;
-    cancelShot(); clearInput(); openFile(file, true);
-  }
+  // An interrupted flight must not open a stale file when the shot would land.
+  if (!state.launched || state.paused || anyDialog() || document.hidden || shot.sourceVersion !== state.sourceVersion) { cancelShot(); return; }
+  const file = state.world?.files.find((file) => file.id === shot.file.id);
+  if (!file) { cancelShot(); toast('That signal is no longer in this folder.'); return; }
+  const event = stepFileShot(shot, dt);
+  if (event === 'impact') addRipple(shot.end, file.color);
+  if (event === 'open') {
+    cancelShot();
+    openFile(file, true);
+  } else renderShot();
 }
 
 function disposeGroup(group) {
@@ -464,7 +475,7 @@ function updateMission() {
   $('sector-count').textContent = `${state.visited.size} district${state.visited.size === 1 ? '' : 's'} visited`;
   $('mission-state').textContent = !total ? 'AWAITING FILES' : progress === 1 ? 'COMPLETE' : 'IN PROGRESS';
 }
-async function scanFile() {
+function scanFile() {
   if (!state.launched || state.paused || anyDialog() || shot) return;
   const file = scanCandidate();
   if (!file) { toast('No signal in your sights. Turn toward a crystal, or fly within 18 units.'); return; }
@@ -473,12 +484,15 @@ async function scanFile() {
   if (!ranged) {
     state.holding = true;
     state.ship.velocity = { x: 0, y: 0, z: 0 };
+    openFile(file, false);
   } else {
-    fireBeam(file); return;
+    fireBeam(file);
+    // Remove course/miss toasts so the launch and target stay visible.
+    clearTimeout(toastTimer); $('toast').classList.remove('show');
   }
-  await openFile(file, false);
 }
 async function openFile(file, ranged) {
+  clearInput();
   const sourceVersion = state.sourceVersion;
   const opened = await fileViewer.open(file);
   if (!opened || sourceVersion !== state.sourceVersion) return;
@@ -493,6 +507,7 @@ function scanCandidate() {
   return findScanCandidate(state.world, state.ship, state.focusedFileId);
 }
 function setCourse(target, kind) {
+  cancelShot();
   if (!state.launched) launch();
   state.paused = false; state.holding = false; state.destination = { ...target, kind }; state.focusedFileId = kind === 'file' ? target.id : null; $('atlas').close();
   toast(`Course set for ${target.name}. Aim and press E from range, or open nearby. Steering keys return control to you.`);
@@ -585,30 +600,30 @@ let hudElapsed = 0;
 function updateHUD(dt) {
   const candidate = state.launched ? scanCandidate() : null;
   $('reticle').hidden = !state.launched || state.paused || anyDialog();
-  $('reticle').classList.toggle('locked', !!candidate);
-  $('reticle-target').textContent = shot ? `Firing at ${shot.file.name}…` : candidate ? `${candidate.name} · E` : 'Aim at a signal · E';
+  $('reticle').classList.toggle('locked', !!candidate || !!shot);
+  $('reticle-target').textContent = shot ? `${shot.file.name} · ${shot.phase === 'flight' ? 'FIRING' : 'HIT'}` : candidate ? `${candidate.name} · E` : 'Aim at a signal · E';
   hudElapsed += dt; if (hudElapsed < .09) return; hudElapsed = 0;
   $('scene').dataset.telemetry = JSON.stringify(window.__SPACE_DRIFT__?.getState());
   if (!state.world) return;
   const ship = state.ship;
   const speed = Math.hypot(ship.velocity.x, ship.velocity.y, ship.velocity.z);
   $('speed').textContent = String(Math.round(speed)).padStart(3, '0'); $('speed-bar').style.width = `${Math.min(speed / 120, 1) * 100}%`;
-  const paused = state.paused || anyDialog() || !!shot;
-  $('flight-state').textContent = !state.launched ? 'AWAITING PILOT' : shot ? 'FIRING' : paused ? 'FLIGHT PAUSED' : state.destination ? 'FOLLOWING COURSE' : state.holding ? 'HOLDING POSITION' : speed > 65 ? 'BOOST ENGAGED' : speed > 2 ? 'CRUISING' : 'DRIFTING';
+  const paused = state.paused || anyDialog();
+  $('flight-state').textContent = !state.launched ? 'AWAITING PILOT' : paused ? 'FLIGHT PAUSED' : state.destination ? 'FOLLOWING COURSE' : state.holding ? 'HOLDING POSITION' : speed > 65 ? 'BOOST ENGAGED' : speed > 2 ? 'CRUISING' : 'DRIFTING';
   $('view-label').textContent = paused ? 'FLIGHT PAUSED' : state.destination ? 'GUIDED FLIGHT' : 'FREE EXPLORATION';
   $('coordinates').textContent = `X ${Math.round(ship.position.x).toString().padStart(4, '0')}   Y ${Math.round(ship.position.y).toString().padStart(4, '0')}   Z ${Math.round(ship.position.z).toString().padStart(4, '0')}`;
-  const nearest = candidate || findNearestFile(state.world, ship.position, SHOT_RANGE); state.nearest = nearest;
+  const nearest = shot?.file || candidate || findNearestFile(state.world, ship.position, SHOT_RANGE); state.nearest = nearest;
   $('file-panel').hidden = !state.launched || !nearest;
   if (nearest) {
     const range = distance(nearest.position, ship.position), scanned = state.charted.has(nearest.id);
-    $('file-status').textContent = range > SCAN_RANGE && candidate ? 'IN YOUR SIGHTS' : scanned ? 'CHARTED SIGNAL' : range <= SCAN_RANGE ? 'WITHIN SCAN RANGE' : 'SIGNAL DETECTED';
+    $('file-status').textContent = shot ? (shot.phase === 'flight' ? 'SHOT IN FLIGHT' : 'SIGNAL HIT') : range > SCAN_RANGE && candidate ? 'IN YOUR SIGHTS' : scanned ? 'CHARTED SIGNAL' : range <= SCAN_RANGE ? 'WITHIN SCAN RANGE' : 'SIGNAL DETECTED';
     $('file-distance').textContent = `${Math.round(range)} u`;
     $('file-name').textContent = nearest.name; $('file-path').textContent = nearest.path;
     $('file-type').textContent = nearest.extension ? nearest.extension.toUpperCase() : 'FILE';
     $('file-size').textContent = formatBytes(nearest.size);
     const hours = Math.max(0, (Date.now() - Date.parse(nearest.modifiedAt)) / 3600000);
     $('file-age').textContent = !Number.isFinite(hours) ? 'Unknown age' : hours < 1 ? 'Changed <1h ago' : hours < 48 ? `Changed ${Math.floor(hours)}h ago` : `Changed ${Math.floor(hours / 24)}d ago`;
-    $('scan').disabled = !candidate || paused;
+    $('scan').disabled = !candidate || paused || !!shot;
     $('scan').firstChild.textContent = shot ? 'Firing… ' : !candidate ? 'Aim or approach to open ' : distance(candidate.position, ship.position) > SCAN_RANGE ? 'Fire to open ' : 'Open file ';
   }
   const region = state.world.sectors.find((s) => distance(s.position, ship.position) < s.radius + 20);
@@ -622,8 +637,8 @@ function animate(time) {
   requestAnimationFrame(animate);
   const now = time / 1000, dt = Math.min(.05, now - (animate.last || now)); animate.last = now;
   updateShot(dt);
-  // Preserve cruising velocity during the brief shot preview, as in the viewer.
-  const paused = state.paused || anyDialog() || document.hidden || !!shot;
+  // Keep cruising during the visible shot; only the viewer pauses flight.
+  const paused = state.paused || anyDialog() || document.hidden;
   if (!paused) state.time += dt;
   state.fps += ((dt ? 1 / dt : 60) - state.fps) * .02;
   if (state.world && state.launched && !paused) stepShip(state.ship, playerInput(), state.world, dt, { currents: state.currents });
@@ -656,7 +671,7 @@ function animate(time) {
     attribute.needsUpdate = true;
   }
   for (const ripple of ripples) {
-    if (!paused || shot || fileViewer.isOpen) ripple.age += dt;
+    if (!paused || fileViewer.isOpen) ripple.age += dt;
     const scale = 1 + ripple.age * 25; ripple.mesh.scale.setScalar(scale); ripple.mesh.material.opacity = Math.max(0, .8 - ripple.age / 3);
   }
   ripples = ripples.filter((r) => { if (r.age < 2.4) return true; scene.remove(r.mesh); r.mesh.geometry.dispose(); r.mesh.material.dispose(); return false; });

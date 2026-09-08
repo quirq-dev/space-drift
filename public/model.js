@@ -309,6 +309,29 @@ export function findScanCandidate(world, ship, focusedFileId = null) {
   return best;
 }
 
+/** A shot leaves the ship's nose and keeps its launch/impact points as flight continues. */
+export function createFileShot(ship, file) {
+  const start = { x: ship.position.x - Math.sin(ship.yaw) * 5.4, y: ship.position.y + .6, z: ship.position.z - Math.cos(ship.yaw) * 5.4 };
+  const end = { ...file.position };
+  const distance = Math.hypot(end.x - start.x, end.y - start.y, end.z - start.z);
+  return { file, start, end, distance, duration: Math.max(.45, distance / 100), age: 0, progress: 0, phase: 'flight' };
+}
+
+/** Emit each event once, leaving a visible impact beat before the modal opens. */
+export function stepFileShot(shot, dt) {
+  if (shot.phase === 'complete') return null;
+  shot.age += clamp(finite(dt), 0, .1);
+  if (shot.phase === 'flight') {
+    shot.progress = Math.min(1, shot.age / shot.duration);
+    if (shot.progress < 1) return null;
+    shot.phase = 'impact'; shot.age = 0;
+    return 'impact';
+  }
+  if (shot.age < .2) return null;
+  shot.phase = 'complete';
+  return 'open';
+}
+
 export function formatBytes(value) {
   const size = Math.max(0, finite(value));
   if (size < 1024) return `${Math.round(size)} B`;

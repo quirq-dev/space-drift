@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildWorld, stepShip, findNearestFile, findScanCandidate, SCAN_RANGE, SHOT_RANGE, formatBytes } from '../public/model.js';
+import { buildWorld, stepShip, findNearestFile, findScanCandidate, createFileShot, stepFileShot, SCAN_RANGE, SHOT_RANGE, formatBytes } from '../public/model.js';
 
 const file = (path, size = 1024) => ({ path, name: path.split('/').at(-1), size, modifiedAt: '2026-09-07T00:00:00Z' });
 const snapshot = (files) => ({ root: { name: 'My folder' }, scannedAt: '2026-09-07T12:00:00Z', files });
@@ -167,4 +167,56 @@ test('focus stays locked within shot range, with fallback when out of range or r
   const distant = signal('focused', 0, 0, -91);
   assert.equal(findScanCandidate({ files: [centred, distant] }, aimShip(), distant.id), centred);
   assert.equal(findScanCandidate({ files: [centred] }, aimShip(), 'removed'), centred);
+});
+
+test('ranged shots snapshot a nose launch point and target while the ship keeps moving', () => {
+  const ship = { position: { x: 10, y: 12, z: 70 }, yaw: Math.PI / 2 };
+  const target = signal('target', -50, 20, 70);
+  const shot = createFileShot(ship, target);
+  assert(Math.abs(shot.start.x - 4.6) < 1e-10);
+  assert.equal(shot.start.y, 12.6);
+  assert.equal(shot.start.z, 70);
+  assert.deepEqual(shot.end, target.position);
+  ship.position.x = 100;
+  target.position.x = 200;
+  assert(Math.abs(shot.start.x - 4.6) < 1e-10);
+  assert.equal(shot.end.x, -50);
+  assert.equal(shot.phase, 'flight');
+  assert.equal(shot.progress, 0);
+});
+
+test('shots take visible travel time, with longer flights for distant signals', () => {
+  const close = createFileShot(aimShip(), signal('close', 0, 0, -19));
+  const distant = createFileShot(aimShip(), signal('distant', 0, 0, -SHOT_RANGE));
+  assert.equal(close.duration, .45);
+  assert(distant.duration > .8 && distant.duration < 1);
+  assert.equal(stepFileShot(distant, .1), null);
+  assert(distant.progress > 0 && distant.progress < 1);
+  assert.equal(distant.phase, 'flight');
+});
+
+test('a shot emits one impact, holds it visibly, then opens exactly once', () => {
+  const shot = createFileShot(aimShip(), signal('target', 0, 0, -90));
+  while (shot.progress + .1 / shot.duration < 1) assert.equal(stepFileShot(shot, .1), null);
+  assert.equal(stepFileShot(shot, .1), 'impact');
+  assert.equal(shot.progress, 1);
+  assert.equal(shot.phase, 'impact');
+  assert.equal(shot.age, 0);
+  assert.equal(stepFileShot(shot, .1), null);
+  assert.equal(shot.phase, 'impact');
+  assert.equal(stepFileShot(shot, .1), 'open');
+  assert.equal(shot.phase, 'complete');
+  for (let frame = 0; frame < 10; frame++) assert.equal(stepFileShot(shot, .1), null);
+});
+
+test('zero time pauses a shot and delayed frames cannot skip the impact beat', () => {
+  const shot = createFileShot(aimShip(), signal('target', 0, 0, -19));
+  const initial = structuredClone(shot);
+  assert.equal(stepFileShot(shot, 0), null);
+  assert.deepEqual(shot, initial);
+  for (let frame = 0; frame < 4; frame++) assert.equal(stepFileShot(shot, 10), null);
+  assert.equal(stepFileShot(shot, 10), 'impact');
+  assert.equal(stepFileShot(shot, 10), null);
+  assert.equal(shot.phase, 'impact');
+  assert.equal(stepFileShot(shot, 10), 'open');
 });
