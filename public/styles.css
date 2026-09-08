@@ -240,3 +240,6 @@
 @media(max-height:800px) and (min-width:701px){.world-info .physics-note{display:none}.world-info .legend{margin:12px 0}.source-note{margin-top:10px;padding-top:9px}.file-panel{top:auto;bottom:112px}.file-panel h2{margin:10px 0 6px}.file-properties{margin:10px 0}.world-name{margin:12px 0}.world-stats{padding-bottom:12px}}
 @media(max-width:700px){header{gap:10px}.connection{display:none}.folder-button{margin-left:auto;font-size:9px;padding:8px}.source-note{font-size:8px;line-height:1.45;margin-top:9px;padding-top:8px}.source-actions{gap:8px;margin-top:7px}.source-actions .text-button{margin-top:0;font-size:8px}.file-panel{top:auto;bottom:366px}.intro-note{max-width:300px;line-height:1.5}.snapshot-picker{font-size:9px}.intro .folder-error{max-width:285px;font-size:10px}.world-info{width:170px}.intro{max-width:calc(100vw - 45px)}}
 @media(max-width:360px){.brand{font-size:12px;letter-spacing:1.5px}.brand svg{width:23px}.folder-button{padding:7px;font-size:8px}header{padding:0 14px;gap:8px}}
+
+/* Keep mobile HUD panels from covering the travelling shot and its impact. */
+@media(max-width:700px){body.shot-preview .mission,body.shot-preview .world-info,body.shot-preview .file-panel,body.shot-preview #toast{visibility:hidden}}
