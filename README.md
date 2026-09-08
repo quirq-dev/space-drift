@@ -1,5 +1,7 @@
 # Space
 
+![A ship flying through glowing folder districts and file crystals in space.](assets/space-hero.svg)
+
 Fly a small ship through a living map of a local folder. Folders form districts, file size gives objects mass, and file activity creates currents you can feel while flying. This is a local prototype: your folder supplies the world, and the game maps file names and metadata, then reads file contents locally when you press E to open them.
 
 ## Run
@@ -37,40 +39,68 @@ Click **Launch expedition** to begin. Chart five files to complete the first exp
 
 The interface includes exploration and navigation controls. The world refreshes from disk every five seconds while the page is open. Edit, add, rename, or move a file in your normal editor or file manager to create activity in the map. The game itself does not change your files.
 
-## Map at a glance
+## Tech stack
+
+| Layer | Technology | Role |
+| --- | --- | --- |
+| Runtime | Node.js 20+ | Runs the local server and filesystem scanner. |
+| Server | Native `node:http` | Serves the app and local-only JSON/file endpoints. |
+| 3D rendering | [Three.js](https://threejs.org/) | Draws the browser-based space map and ship. |
+| Client | Vanilla JavaScript ES modules, HTML, and CSS | Handles input, atlas navigation, UI, and the file viewer. |
+| Filesystem | Node.js `fs`, `path`, and streams APIs | Scans eligible files and provides bounded local previews. |
+| Tests | Node.js built-in test runner | Covers scanning, file access, physics, and HTTP boundaries. |
+
+## Architecture
 
 ```text
-Your local folder
-        |
-        | scan names, sizes, and modification times
-        v
-+------------------+        refresh every 5 seconds        +------------------+
-| Space server     | ------------------------------------> | Browser world    |
-| (127.0.0.1 only) |                                       | districts, files |
-+------------------+                                       +------------------+
-        |                                                           |
-        | read a selected file only when you press E                | fly, chart, or search
-        v                                                           v
-+------------------+                                       +------------------+
-| Local file       | <----------------------------------- | File viewer /    |
-| contents         |                                       | workspace atlas  |
-+------------------+                                       +------------------+
+                                  LOCAL MACHINE ONLY
++----------------------+                 |                 +------------------------+
+| Selected workspace   |                 |                 | Browser                |
+| folders and files    |                 |                 | Three.js + vanilla JS  |
++----------+-----------+                 |                 +-----------+------------+
+           |                             |                             |
+           | bounded scan: names, paths, |                             | GET /api/world
+           | sizes, timestamps; ignores  |                             | every 5 seconds
+           | hidden/generated/unsafe     |                             v
+           v                             |                 +-----------+------------+
++----------+----------------------------+--+              | Space server           |
+| lib/scan.mjs                             |              | node:http on 127.0.0.1 |
+| creates world snapshots and change events |              +-----------+------------+
++----------+----------------------------+--+                          |
+           ^                             |                             | checks requested path
+           | E opens a mapped file only  |                             | against latest eligible map
+           |                             |                             v
++----------+----------------------------+--+              +-----------+------------+
+| Local file preview / media stream        | <-----------> | File viewer / atlas    |
+| text, image, PDF, audio, or video        |   /api/file   | user interaction       |
++-------------------------------------------+   endpoints  +------------------------+
 ```
 
+The browser receives map metadata during normal refreshes. It requests file contents only after you choose a mapped file to preview; the server stays bound to `127.0.0.1` and rejects paths outside the eligible map.
+
+## Flight and exploration flow
+
 ```text
+Open Space
+    |
+    v
+Load world snapshot --------------------> districts, file crystals, activity currents
+    |
+    v
 Launch expedition
-        |
-        v
-Explore districts -- M --> choose a destination --> guided flight
-        |                         |
-        | E near a file           | steering input
-        v                         v
-Open local preview <------------- return to manual flight
-        |
-        +-- chart five files --> first expedition complete
+    |
+    +--> Manual flight: W/A/S/D, R/F, Shift, Space
+    |          |
+    |          +--> approach a crystal and press E
+    |          |          |
+    |          |          +--> open local preview --> close / Escape --> resume at the same location
+    |          |          |
+    |          |          +--> first visit charts the file --> 5 charted files complete the expedition
+    |          |
+    |          +--> press M --> search atlas or choose a district/file --> guided flight
+    |                                                              |
+    +--------------------------------------------------------------+--> any steering input returns to manual flight
 ```
-
-The map is built from metadata first; file contents are requested only for the local preview opened with **E**. Any steering input cancels guided flight.
 
 ## Open a file
 
