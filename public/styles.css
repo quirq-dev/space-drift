@@ -220,3 +220,20 @@
 .reticle{opacity:.25}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 
+
+/* Folder connection works on a static host; its controls stay available in flight. */
+.folder-button{flex-shrink:0;background:rgba(170,184,255,.09);border:1px solid #46517e;border-radius:4px;padding:9px 12px;font-size:10px;color:var(--accent);white-space:nowrap}
+.folder-button:hover{background:rgba(170,184,255,.17);border-color:var(--accent)}
+.connection{min-width:0}.connection #connection{max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.brand{flex-shrink:0}.brand>span:first-of-type{white-space:nowrap}
+.snapshot-picker{margin-top:17px;color:var(--soft);font-size:10px}
+.intro .folder-error{color:var(--coral);max-width:340px;line-height:1.6;font-size:11px}
+.source-note{border-top:1px solid var(--line);padding-top:12px;margin:14px 0 0;color:var(--soft);font-size:10px;line-height:1.6}
+.source-actions{display:flex;justify-content:space-between;gap:12px;margin-top:12px}
+.source-actions:has(button[hidden]){display:none}
+.file-panel{top:505px}
+@media(min-width:1051px) and (max-width:1390px){.version{display:none}}
+@media(max-width:1050px){header{gap:16px}.local-tag{display:none}.file-panel{top:493px}}
+@media(max-height:800px) and (min-width:701px){.world-info .physics-note{display:none}.world-info .legend{margin:12px 0}.source-note{margin-top:10px;padding-top:9px}.file-panel{top:auto;bottom:112px}.file-panel h2{margin:10px 0 6px}.file-properties{margin:10px 0}.world-name{margin:12px 0}.world-stats{padding-bottom:12px}}
+@media(max-width:700px){header{gap:10px}.connection{display:none}.folder-button{margin-left:auto;font-size:9px;padding:8px}.source-note{font-size:8px;line-height:1.45;margin-top:9px;padding-top:8px}.source-actions{gap:8px;margin-top:7px}.source-actions .text-button{margin-top:0;font-size:8px}.file-panel{top:auto;bottom:366px}.intro-note{max-width:300px;line-height:1.5}.snapshot-picker{font-size:9px}.intro .folder-error{max-width:285px;font-size:10px}.world-info{width:170px}.intro{max-width:calc(100vw - 45px)}}
+@media(max-width:360px){.brand{font-size:12px;letter-spacing:1.5px}.brand svg{width:23px}.folder-button{padding:7px;font-size:8px}header{padding:0 14px;gap:8px}}

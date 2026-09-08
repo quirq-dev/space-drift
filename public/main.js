@@ -1,6 +1,7 @@
 import * as THREE from '/vendor/three.module.js';
 import { buildWorld, stepShip, findNearestFile, formatBytes, hash } from './model.js';
 import { createFileViewer } from './viewer.js';
+import { createDirectorySource, createSnapshotSource } from './folder-source.js';
 
 const $ = (id) => document.getElementById(id);
 const clamp = THREE.MathUtils.clamp;
@@ -14,10 +15,12 @@ const state = {
   focusedFileId: null,
   disconnected: false,
   holding: false,
+  source: null, sourceVersion: 0, loadAbort: null, choosing: false, connecting: false, selectionAbort: null,
+  pickerVersion: 0, snapshotFallback: false,
 };
 const keys = new Set();
 const tapUntil = new Map();
-const fileViewer = createFileViewer({ onClose: () => { clearInput(); $('scene').focus({ preventScroll: true }); } });
+const fileViewer = createFileViewer({ getSource: () => state.source, onClose: () => { clearInput(); $('scene').focus({ preventScroll: true }); } });
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#080b18');
 scene.fog = new THREE.FogExp2('#080b18', .00145);
@@ -170,14 +173,7 @@ function renderWorld(world) {
 }
 
 function signature(snapshot) { return snapshot.files.map((f) => `${f.path}:${f.size}:${f.modifiedAt}`).join('|'); }
-async function loadWorld() {
-  if (state.loading) return;
-  state.loading = true;
-  try {
-    const response = await fetch('/api/world', { signal: AbortSignal.timeout(12000) });
-    if (!response.ok) throw new Error(`The local folder server returned ${response.status}.`);
-    const snapshot = await response.json();
-    if (!Array.isArray(snapshot.files)) throw new Error('The folder map was not in the expected format.');
+function applySnapshot(snapshot) {
     const nextSignature = signature(snapshot);
     const firstLoad = !state.world;
     if (state.disconnected) $('activity-line').textContent = 'Connection restored. The map is listening for changes again.';
@@ -222,27 +218,189 @@ async function loadWorld() {
       if (updated) state.destination = { ...updated, kind: state.destination.kind };
       else { state.destination = null; toast('That destination is no longer in this folder.'); }
     }
-    $('connection').textContent = `${snapshot.root.name} / connected`;
+    $('connection').textContent = `${snapshot.root.name} / ${state.source.live ? 'connected' : 'snapshot'}`;
     document.querySelector('.status-dot').style.background = '';
     $('world-name').textContent = snapshot.root.name;
     $('root-name').textContent = snapshot.root.name.toUpperCase();
     $('file-count').textContent = snapshot.files.length.toLocaleString();
     $('district-count').textContent = nextWorld.sectors.length.toString().padStart(2, '0');
     $('world-size').textContent = formatBytes(snapshot.files.reduce((sum, f) => sum + f.size, 0));
-    $('scan-time').textContent = `SYNCED ${new Date(snapshot.scannedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-    $('privacy-note').textContent = snapshot.truncated ? 'PARTIAL MAP · FILE LIMIT' : snapshot.unreadable ? 'PARTIAL MAP · SOME UNREADABLE' : 'FILES STAY LOCAL';
-    $('launch').disabled = false; $('launch').replaceChildren(document.createTextNode('Launch expedition'), Object.assign(document.createElement('span'), { textContent: '↗' }));
+    $('scan-time').textContent = `${state.source.live ? 'SYNCED' : 'SNAPSHOT'} ${new Date(snapshot.scannedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    $('privacy-note').textContent = snapshot.truncated ? 'PARTIAL MAP · SCAN LIMIT' : snapshot.unreadable ? 'PARTIAL MAP · SOME UNREADABLE' : 'FILES STAY LOCAL';
+    $('launch').disabled = false; $('launch').hidden = false; $('choose-folder').hidden = true; $('map-button').disabled = false; $('launch').replaceChildren(document.createTextNode('Launch expedition'), Object.assign(document.createElement('span'), { textContent: '↗' }));
     $('error').hidden = true;
-    if (firstLoad && !nextWorld.files.length) toast('This folder has no visible files yet. Add a file and the map will refresh.');
+    if (firstLoad && !nextWorld.files.length) toast(state.source.live ? 'No eligible files in this folder yet. Add a file or choose another folder.' : 'No eligible files in this snapshot. Choose another folder to explore.');
+    if (firstLoad && !state.source.live) $('activity-line').textContent = 'Folder snapshot. Reselect this folder to include changes.';
+    updateFolderUI();
     updateMission();
     if ($('atlas').open) renderAtlas();
+}
+
+async function loadWorld() {
+  const source = state.source, version = state.sourceVersion;
+  if (!source || state.loading || state.connecting) return false;
+  const request = new AbortController();
+  state.loadAbort = request; state.loading = true;
+  const timeout = setTimeout(() => request.abort(), 12000);
+  try {
+    const snapshot = await source.readWorld({ signal: request.signal });
+    if (source !== state.source || version !== state.sourceVersion || request.signal.aborted) return false;
+    if (!Array.isArray(snapshot.files)) throw new Error('The folder map was not in the expected format.');
+    applySnapshot(snapshot);
+    return true;
   } catch (error) {
+    if (source !== state.source || version !== state.sourceVersion) return false;
     state.disconnected = true;
-    $('connection').textContent = 'Local connection interrupted';
+    $('connection').textContent = 'Folder connection interrupted';
     document.querySelector('.status-dot').style.background = '#ffad9b';
-    if (!state.world) { $('error').hidden = false; $('error-message').textContent = `${error.message} Check the local server, then try again.`; }
-    else $('activity-line').textContent = 'Connection interrupted. Flying through the last snapshot; retrying automatically.';
-  } finally { state.loading = false; }
+    const message = source.kind === 'server' ? 'Check your local server or choose a folder in this browser.' : 'Choose the folder again to reconnect. Your last map is still here.';
+    $('activity-line').textContent = message;
+    $('source-note').textContent = message;
+    if (!state.world) showFolderError(message);
+    return false;
+  } finally {
+    clearTimeout(timeout);
+    if (state.loadAbort === request) { state.loadAbort = null; state.loading = false; }
+  }
+}
+
+function updateFolderUI() {
+  const busy = state.choosing || state.connecting;
+  const connected = !!state.source;
+  $('folder-button').disabled = busy;
+  $('choose-folder').disabled = busy;
+  $('snapshot-picker').disabled = busy;
+  $('folder-button').textContent = busy ? 'Reading folder…' : state.snapshotFallback ? 'Choose snapshot' : connected ? 'Change folder' : 'Connect folder';
+  $('launch').disabled = busy || !state.world;
+  $('choose-folder').replaceChildren(document.createTextNode(busy ? 'Mapping your folder…' : 'Choose a folder'), Object.assign(document.createElement('span'), { textContent: '↗' }));
+  $('disconnect-folder').hidden = !connected;
+  $('refresh-folder').hidden = !connected;
+  $('refresh-folder').disabled = busy;
+  $('refresh-folder').textContent = state.source?.live ? 'Refresh' : 'Reselect to refresh';
+  $('snapshot-picker').hidden = connected;
+  if (connected) {
+    const count = state.snapshot?.files.length || 0;
+    $('folder-note').textContent = `${count.toLocaleString()} ${count === 1 ? 'file' : 'files'} mapped. Ready when you are.`;
+    $('source-note').textContent = state.source.kind === 'server' ? 'Local server · live refresh every 5 seconds.' : state.source.live ? 'Connected on this device · refreshes every 5 seconds.' : 'Snapshot · reselect the folder to see changes.';
+  }
+}
+
+function showFolderError(message) {
+  $('folder-error').textContent = message;
+  $('folder-error').hidden = false;
+  toast(message);
+}
+
+function clearFolderWorld() {
+  fileViewer.close();
+  document.querySelectorAll('dialog[open]').forEach((dialog) => dialog.close());
+  state.sourceVersion++; state.loadAbort?.abort(); state.loadAbort = null; state.loading = false;
+  state.source?.dispose(); state.source = null;
+  state.world = null; state.snapshot = null; state.launched = false; state.paused = false;
+  state.charted.clear(); state.visited.clear(); state.seenEvents.clear(); state.signature = '';
+  state.destination = null; state.nearest = null; state.focusedFileId = null; state.holding = false; state.disconnected = false;
+  state.ship = { position: { x: 0, y: 12, z: 70 }, velocity: { x: 0, y: 0, z: 0 }, yaw: 0 };
+  clearInput(); trail = [];
+  for (const ripple of ripples) { scene.remove(ripple.mesh); ripple.mesh.geometry.dispose(); ripple.mesh.material.dispose(); }
+  ripples = [];
+  renderWorld(buildWorld({ files: [] }));
+  $('intro').hidden = false; $('mission').hidden = true; $('file-panel').hidden = true; $('destination').hidden = true;
+  $('launch').hidden = true; $('launch').disabled = true; $('choose-folder').hidden = false;
+  $('folder-error').hidden = true; $('error').hidden = true; $('map-button').disabled = true;
+  $('connection').textContent = 'No folder connected'; $('world-name').textContent = 'Your next destination'; $('root-name').textContent = 'LOCAL WORKSPACE';
+  for (const id of ['file-count', 'district-count', 'world-size']) $(id).textContent = '—';
+  $('source-note').textContent = 'Connect a folder to create your world.';
+  $('folder-note').textContent = 'Your files stay on this device. Nothing is uploaded.';
+  $('scan-time').textContent = 'CHOOSE A FOLDER'; $('privacy-note').textContent = 'FILES STAY LOCAL';
+  $('activity-line').textContent = 'Choose a folder to see your files take shape.';
+  $('pause-button').textContent = 'Ⅱ'; $('pause-button').setAttribute('aria-label', 'Pause flight');
+  $('speed').textContent = '000'; $('speed-bar').style.width = '0%'; $('flight-state').textContent = 'AWAITING PILOT'; $('view-label').textContent = 'FREE EXPLORATION';
+  $('coordinates').textContent = 'X 0000   Y 0012   Z 0070';
+  document.querySelector('.status-dot').style.background = '';
+  updateFolderUI();
+}
+
+async function connectSource(source) {
+  state.connecting = true; $('folder-error').hidden = true; updateFolderUI();
+  const request = new AbortController(); state.selectionAbort?.abort(); state.selectionAbort = request;
+  const timeout = setTimeout(() => request.abort(), 12000);
+  try {
+    const snapshot = await source.readWorld({ signal: request.signal });
+    if (request.signal.aborted || state.selectionAbort !== request) { source.dispose(); return; }
+    if (!Array.isArray(snapshot.files)) throw new Error('This folder could not be mapped.');
+    clearFolderWorld(); state.source = source; state.snapshotFallback = false; applySnapshot(snapshot);
+    toast(source.live ? `Connected to ${snapshot.root.name}. Launch your expedition.` : `Snapshot of ${snapshot.root.name} ready. Files stay on this device.`);
+  } catch (error) {
+    source.dispose();
+    if (state.selectionAbort === request) showFolderError(error.name === 'AbortError' ? 'Reading the folder took too long. Try a smaller folder.' : `Could not connect: ${error.message}`);
+  } finally {
+    clearTimeout(timeout);
+    if (state.selectionAbort === request) { state.selectionAbort = null; state.connecting = false; state.choosing = false; updateFolderUI(); }
+  }
+}
+
+function chooseSnapshot() {
+  if (state.connecting || state.choosing) return;
+  clearInput(); state.choosing = true; state.pickerVersion++; $('folder-error').hidden = true; updateFolderUI();
+  // A FileList is kept only in this tab. No form submission or upload occurs.
+  $('folder-input').value = '';
+  $('folder-input').click();
+}
+
+async function chooseFolder() {
+  if (state.connecting || state.choosing) return;
+  if (state.snapshotFallback || typeof window.showDirectoryPicker !== 'function' || !window.isSecureContext) { chooseSnapshot(); return; }
+  const pickerVersion = ++state.pickerVersion;
+  clearInput(); state.choosing = true; $('folder-error').hidden = true; updateFolderUI();
+  try {
+    const handle = await window.showDirectoryPicker({ mode: 'read', id: 'space-drift-folder' });
+    if (pickerVersion !== state.pickerVersion) return;
+    await connectSource(createDirectorySource(handle));
+  } catch (error) {
+    if (pickerVersion === state.pickerVersion && error.name !== 'AbortError') {
+      state.snapshotFallback = true;
+      showFolderError('Folder access was not granted. Click Choose snapshot to use the standard folder picker.');
+    }
+  } finally { if (pickerVersion === state.pickerVersion) { state.choosing = false; updateFolderUI(); } }
+}
+
+function disconnectFolder() {
+  state.pickerVersion++; state.snapshotFallback = false;
+  state.selectionAbort?.abort(); state.selectionAbort = null; state.choosing = false; state.connecting = false;
+  clearFolderWorld(); toast('Folder disconnected. Choose another world to explore.');
+}
+
+$('choose-folder').addEventListener('click', chooseFolder);
+$('folder-button').addEventListener('click', chooseFolder);
+$('snapshot-picker').addEventListener('click', chooseSnapshot);
+$('folder-input').addEventListener('change', () => {
+  const files = [...$('folder-input').files];
+  $('folder-input').value = '';
+  if (!state.choosing) return;
+  state.choosing = false; updateFolderUI();
+  if (files.length) connectSource(createSnapshotSource(files));
+});
+$('folder-input').addEventListener('cancel', () => { state.choosing = false; updateFolderUI(); });
+$('disconnect-folder').addEventListener('click', disconnectFolder);
+$('refresh-folder').addEventListener('click', () => state.source?.live ? loadWorld() : chooseSnapshot());
+
+async function initializeSource() {
+  const version = state.sourceVersion;
+  try {
+    const response = await fetch('/runtime.json');
+    const runtime = response.ok ? await response.json() : {};
+    if (!runtime.localServer || state.source || state.choosing || state.connecting || version !== state.sourceVersion) return;
+    const source = {
+      kind: 'server', name: 'Local server', live: true,
+      async readWorld({ signal } = {}) {
+        const result = await fetch('/api/world', { signal });
+        if (!result.ok) throw new Error(`The local server returned ${result.status}.`);
+        return result.json();
+      },
+      dispose() {},
+    };
+    await connectSource(source);
+  } catch { /* Static hosting starts at the folder picker without a local API. */ }
 }
 
 function addRipple(position, tint = 0xaab8ff) {
@@ -252,7 +410,7 @@ function addRipple(position, tint = 0xaab8ff) {
 let toastTimer;
 function toast(message) { $('toast').textContent = message; $('toast').classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => $('toast').classList.remove('show'), 4300); }
 function launch() {
-  if (!state.world) return;
+  if (!state.world || state.choosing || state.connecting) return;
   state.launched = true; state.paused = false; $('intro').hidden = true; $('mission').hidden = false; $('pause-button').textContent = 'Ⅱ';
   $('scene').focus({ preventScroll: true });
   toast('W to thrust · A / D to steer · E to open a file · M to choose a destination');
@@ -313,7 +471,7 @@ function renderAtlas() {
     button.addEventListener('click', () => setCourse(target, kind)); $('atlas-results').append(button);
   }
 }
-function anyDialog() { return $('atlas').open || $('manual').open || fileViewer.isOpen; }
+function anyDialog() { return state.choosing || state.connecting || $('atlas').open || $('manual').open || fileViewer.isOpen; }
 function clearInput() { keys.clear(); tapUntil.clear(); }
 function openAtlas() { if (!state.world) return; clearInput(); $('atlas-search').value = ''; renderAtlas(); $('atlas').showModal(); }
 function showManual() { clearInput(); $('manual').showModal(); }
@@ -383,7 +541,9 @@ function playerInput() {
 
 let hudElapsed = 0;
 function updateHUD(dt) {
-  hudElapsed += dt; if (hudElapsed < .09 || !state.world) return; hudElapsed = 0;
+  hudElapsed += dt; if (hudElapsed < .09) return; hudElapsed = 0;
+  $('scene').dataset.telemetry = JSON.stringify(window.__SPACE_DRIFT__?.getState());
+  if (!state.world) return;
   const ship = state.ship;
   const speed = Math.hypot(ship.velocity.x, ship.velocity.y, ship.velocity.z);
   $('speed').textContent = String(Math.round(speed)).padStart(3, '0'); $('speed-bar').style.width = `${Math.min(speed / 120, 1) * 100}%`;
@@ -471,5 +631,5 @@ addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; cam
 renderer.domElement.addEventListener('webglcontextlost', (event) => { event.preventDefault(); state.paused = true; $('error').hidden = false; $('error-message').textContent = 'The graphics context was interrupted. Reload to return to the launch point.'; });
 
 // Read-only diagnostics support real-control browser tests without teleport hooks.
-window.__SPACE_DRIFT__ = Object.freeze({ getState: () => ({ ready: !!state.world, launched: state.launched, paused: state.paused, currents: state.currents, position: { ...state.ship.position }, velocity: { ...state.ship.velocity }, yaw: state.ship.yaw, files: state.world?.files.length || 0, sectors: state.world?.sectors.length || 0, charted: [...state.charted], visited: [...state.visited], destination: state.destination ? { id: state.destination.id, name: state.destination.name, kind: state.destination.kind } : null, nearest: state.nearest ? { id: state.nearest.id, distance: distance(state.ship.position, state.nearest.position) } : null, fps: Math.round(state.fps), drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles, liveEvents: state.snapshot?.events.length || 0, viewerOpen: fileViewer.isOpen, openedFile: fileViewer.path }) });
-loadWorld(); setInterval(loadWorld, 5000); requestAnimationFrame(animate);
+window.__SPACE_DRIFT__ = Object.freeze({ getState: () => ({ ready: !!state.world, source: state.source ? { kind: state.source.kind, name: state.snapshot?.root.name || state.source.name, live: state.source.live } : null, launched: state.launched, paused: state.paused, currents: state.currents, position: { ...state.ship.position }, velocity: { ...state.ship.velocity }, yaw: state.ship.yaw, files: state.world?.files.length || 0, sectors: state.world?.sectors.length || 0, charted: [...state.charted], visited: [...state.visited], destination: state.destination ? { id: state.destination.id, name: state.destination.name, kind: state.destination.kind } : null, nearest: state.nearest ? { id: state.nearest.id, distance: distance(state.ship.position, state.nearest.position) } : null, fps: Math.round(state.fps), drawCalls: renderer.info.render.calls, triangles: renderer.info.render.triangles, liveEvents: state.snapshot?.events.length || 0, viewerOpen: fileViewer.isOpen, openedFile: fileViewer.path }) });
+initializeSource(); setInterval(() => { if (state.source?.live) loadWorld(); }, 5000); requestAnimationFrame(animate);

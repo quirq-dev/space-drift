@@ -115,6 +115,7 @@ test('HTTP world map exposes only metadata and static routes stay restricted', a
   t.after(() => new Promise((resolve) => server.close(resolve)));
   const base = `http://127.0.0.1:${server.address().port}`;
   assert.equal((await fetch(base + '/api/health')).status, 200);
+  assert.deepEqual(await (await fetch(base + '/runtime.json')).json(), { localServer: true });
   assert.match(await (await fetch(base + '/')).text(), /Space Drift/);
   const world = await (await fetch(base + '/api/world')).json();
   assert.ok(world.files.some((file) => file.path === 'private.txt'));

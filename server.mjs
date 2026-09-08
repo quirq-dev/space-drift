@@ -94,6 +94,7 @@ export function createServer({ root = path.dirname(APP_DIRECTORY), scannerOption
         response.setHeader('Allow', 'GET');
         return send(405, { error: 'Only GET requests are supported on this route.' });
       }
+      if (pathname === '/runtime.json') return send(200, { localServer: true });
       if (pathname === '/api/health') return send(200, { ok: true, name: 'Space Drift', protocolVersion: 2, capabilities: ['file-preview', 'native-file-open'] });
       if (pathname === '/api/world') return send(200, await readWorld());
       if (pathname === '/api/file' || pathname === '/api/file-content') {
